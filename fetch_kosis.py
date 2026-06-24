@@ -54,10 +54,10 @@ CONFIG = {
 
 
 def fetch_period(cfg, start_prd, end_prd, retries=3):
-    params = {
+params = {
         "method": "getList", "apiKey": API_KEY,
         "orgId": cfg["org_id"], "tblId": cfg["tbl_id"],
-        "itmId": "ALL", "objL1": "ALL", "objL2": "ALL", "objL3": "ALL",
+        "itmId": "ALL", "objL1": "ALL",
         "format": "json", "jsonVD": "Y",
         "prdSe": cfg["freq"], "startPrdDe": start_prd, "endPrdDe": end_prd,
     }
