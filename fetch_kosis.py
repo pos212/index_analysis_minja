@@ -54,7 +54,7 @@ CONFIG = {
 
 
 def fetch_period(cfg, start_prd, end_prd, retries=3):
-params = {
+    params = {
         "method": "getList", "apiKey": API_KEY,
         "orgId": cfg["org_id"], "tblId": cfg["tbl_id"],
         "itmId": "ALL", "objL1": "ALL",
