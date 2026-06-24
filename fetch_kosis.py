@@ -32,23 +32,23 @@ CONFIG = {
         "name": "소비자물가지수", "short": "CPI",
         "org_id": "101", "tbl_id": "DT_1J22003", "freq": "M",
         "unit": "2020=100",
-        # 분류값명/항목명 어딘가에 아래 키워드가 모두 들어간 행을 선택
-        "include": ["총지수"],
-        "item_hint": ["지수"],          # 항목명 보조 힌트(지수 수준값)
+        "itm_id": "T", "obj_l1": "T10",                    # 지수 / 총지수
+        "include": ["총지수"], "item_hint": ["지수"],
     },
     "construction": {
         "name": "건설공사비지수", "short": "공사비",
         "org_id": "397", "tbl_id": "DT_39701_A003", "freq": "M",
         "unit": "2020=100",
-        "include": ["총지수"],
-        "item_hint": ["지수"],
+        "itm_id": "16397AAA0", "obj_l1": "15397AA2AA",     # 건설공사비지수 / 건설(전체)
+        "include": ["건설"], "item_hint": ["지수"],
     },
     "deflator": {
         "name": "건설투자 디플레이터", "short": "디플레이터",
         "org_id": "301", "tbl_id": "DT_200Y112", "freq": "Q",
         "unit": "2020=100",
-        "include": ["건설투자"],
-        "item_hint": ["디플레이터", "지수"],   # 둘 중 하나라도 맞으면 가점
+        "itm_id": "13103136282999",                        # 디플레이터 항목
+        "obj_l1": "13102136282ACC_ITEM.1020111",           # 건설투자
+        "include": ["건설투자"], "item_hint": ["디플레이터", "지수"],
     },
 }
 
@@ -57,7 +57,8 @@ def fetch_period(cfg, start_prd, end_prd, retries=3):
     params = {
         "method": "getList", "apiKey": API_KEY,
         "orgId": cfg["org_id"], "tblId": cfg["tbl_id"],
-        "itmId": "ALL", "objL1": "ALL",
+        "itmId": cfg.get("itm_id", "ALL"),
+        "objL1": cfg.get("obj_l1", "ALL"),
         "format": "json", "jsonVD": "Y",
         "prdSe": cfg["freq"], "startPrdDe": start_prd, "endPrdDe": end_prd,
     }
