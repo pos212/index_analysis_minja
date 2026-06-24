@@ -1,1 +1,417 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>민간투자사업 적용 지수 분석</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+<link rel="stylesheet" as="style" crossorigin
+  href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+<link rel="stylesheet"
+  href="https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-mono@5.0.13/index.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#F4F6F8; --panel:#FFFFFF; --ink:#14202C; --muted:#5E6E7C;
+    --hair:#E4E8EC; --hair-strong:#CFD6DD;
+    --cpi:#2C6E9B;          /* 소비자물가지수 — 계약 기준지수, 차분한 청색 */
+    --con:#D6841F;          /* 건설공사비지수 — 자재/공사, 황색 */
+    --def:#1E8A6E;          /* 건설투자 디플레이터 — 거시, 녹청 */
+    --gap:rgba(214,132,31,.12);
+    --mono:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans:"Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--sans);
+    -webkit-font-smoothing:antialiased; line-height:1.55;
+    font-feature-settings:"tnum" 1;
+  }
+  .wrap{max-width:1080px; margin:0 auto; padding:32px 22px 64px}
 
+  /* ---- Header ---- */
+  header{border-bottom:1px solid var(--hair-strong); padding-bottom:22px; margin-bottom:26px}
+  .eyebrow{
+    font-size:12px; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--muted); font-weight:600; margin:0 0 10px;
+  }
+  h1{
+    font-size:clamp(26px,4.4vw,40px); font-weight:800; letter-spacing:-.02em;
+    margin:0 0 12px; line-height:1.12;
+  }
+  .lede{margin:0; color:var(--muted); font-size:15px; max-width:62ch}
+  .lede b{color:var(--ink); font-weight:600}
+
+  /* ---- Controls ---- */
+  .controls{
+    display:flex; flex-wrap:wrap; align-items:flex-end; gap:16px;
+    background:var(--panel); border:1px solid var(--hair); border-radius:14px;
+    padding:18px 20px; margin-bottom:22px;
+  }
+  .field{display:flex; flex-direction:column; gap:6px}
+  .field label{font-size:12px; font-weight:600; color:var(--muted); letter-spacing:.01em}
+  .field input[type="month"]{
+    font-family:var(--mono); font-size:15px; color:var(--ink);
+    border:1px solid var(--hair-strong); border-radius:9px; padding:9px 11px;
+    background:#fff; min-width:148px;
+  }
+  .field input:focus-visible{outline:2px solid var(--cpi); outline-offset:1px; border-color:var(--cpi)}
+  .ctl-note{font-size:11.5px; color:var(--muted); margin-top:3px}
+  .grow{flex:1 1 auto}
+  button#run{
+    font-family:var(--sans); font-size:15px; font-weight:700; color:#fff;
+    background:var(--ink); border:0; border-radius:10px; padding:11px 22px; cursor:pointer;
+    transition:transform .12s ease, background .12s ease;
+  }
+  button#run:hover{background:#0c2230}
+  button#run:active{transform:translateY(1px)}
+  button#run:focus-visible{outline:2px solid var(--cpi); outline-offset:2px}
+
+  /* ---- Chart panel ---- */
+  .panel{background:var(--panel); border:1px solid var(--hair); border-radius:14px; padding:20px 20px 14px}
+  .panel + .panel{margin-top:20px}
+  .panel-head{display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:6px}
+  .panel-head h2{font-size:15px; font-weight:700; margin:0; letter-spacing:-.01em}
+  .panel-head .sub{font-size:12px; color:var(--muted)}
+  .legend{display:flex; flex-wrap:wrap; gap:18px; margin:10px 2px 14px; font-size:13px}
+  .legend span{display:inline-flex; align-items:center; gap:7px; color:var(--ink)}
+  .swatch{width:22px; height:3px; border-radius:2px; display:inline-block}
+  .chart-box{position:relative; height:380px}
+  @media(max-width:560px){ .chart-box{height:300px} }
+
+  /* ---- Table ---- */
+  table{width:100%; border-collapse:collapse; margin-top:4px; font-size:14px}
+  caption{text-align:left; font-size:15px; font-weight:700; padding:0 0 12px; letter-spacing:-.01em}
+  th,td{padding:11px 12px; text-align:right; border-bottom:1px solid var(--hair)}
+  th:first-child,td:first-child{text-align:left}
+  thead th{font-size:12px; font-weight:600; color:var(--muted); border-bottom:1px solid var(--hair-strong); letter-spacing:.01em}
+  tbody td.num{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:13.5px}
+  .idx-tag{display:inline-flex; align-items:center; gap:8px; font-weight:600}
+  .dot{width:9px; height:9px; border-radius:50%; flex:none}
+  .up{color:#b5471f} .down{color:#1e6b50}
+  .delta{font-family:var(--mono); font-weight:600}
+
+  /* ---- Analysis prose ---- */
+  .analysis h2{font-size:15px; font-weight:700; margin:0 0 12px; letter-spacing:-.01em}
+  .analysis p{margin:0 0 12px; font-size:14.5px}
+  .analysis .key{
+    border-left:3px solid var(--con); background:#FBF6EE; border-radius:0 10px 10px 0;
+    padding:14px 16px; margin:0 0 14px;
+  }
+  .analysis .key strong{color:#9c5908}
+  .analysis .caveat{font-size:12.5px; color:var(--muted); border-top:1px dashed var(--hair-strong); padding-top:12px; margin-top:4px}
+  mark{background:transparent; font-family:var(--mono); font-weight:600; color:inherit; padding:0 1px}
+
+  /* ---- Footer / banner ---- */
+  .banner{
+    background:#FFF7E6; border:1px solid #F0DDA8; color:#7a5a12;
+    border-radius:10px; padding:10px 14px; font-size:13px; margin-bottom:18px;
+  }
+  .banner b{font-weight:700}
+  footer{margin-top:30px; padding-top:18px; border-top:1px solid var(--hair); font-size:12px; color:var(--muted)}
+  footer code{font-family:var(--mono); font-size:11.5px}
+  footer a{color:var(--cpi); text-decoration:none}
+  .hidden{display:none !important}
+
+  @media (prefers-reduced-motion: reduce){ button#run{transition:none} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">민간투자사업 분석도구</p>
+    <h1>민간투자사업 적용 지수 분석</h1>
+    <p class="lede">가격기준시점을 <b>100</b>으로 재지수화하여 <b>소비자물가지수·건설공사비지수·건설투자 디플레이터</b>의
+      상대 추이를 비교합니다. 협약상 보정지수(통상 소비자물가지수)로 건설이자 등을 산정할 때
+      실제 공사비 상승과의 격차를 가늠하기 위한 <b>참고용</b> 분석입니다.</p>
+  </header>
+
+  <div id="sampleBanner" class="banner hidden">
+    <b>샘플 데이터로 표시 중입니다.</b> GitHub Actions가 실제 KOSIS 자료를 받아
+    <code>data/indices.json</code>을 갱신하면 자동으로 실제 수치로 바뀝니다.
+  </div>
+
+  <div class="controls">
+    <div class="field">
+      <label for="start">시점 (가격기준시점)</label>
+      <input type="month" id="start" />
+    </div>
+    <div class="field">
+      <label for="end">종점</label>
+      <input type="month" id="end" />
+      <span class="ctl-note">기본값: 최신 자료월</span>
+    </div>
+    <div class="grow"></div>
+    <button id="run" type="button">분석</button>
+  </div>
+
+  <section class="panel" aria-label="지수 추이 그래프">
+    <div class="panel-head">
+      <h2>재지수화 추이 <span class="sub">(시점 = 100)</span></h2>
+      <span class="sub" id="rangeLabel">—</span>
+    </div>
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--cpi)"></i>소비자물가지수</span>
+      <span><i class="swatch" style="background:var(--con)"></i>건설공사비지수</span>
+      <span><i class="swatch" style="background:var(--def)"></i>건설투자 디플레이터</span>
+      <span><i class="swatch" style="background:var(--gap);height:11px;border:1px solid #e6c894"></i>공사비−물가 격차</span>
+    </div>
+    <div class="chart-box"><canvas id="chart"></canvas></div>
+  </section>
+
+  <section class="panel">
+    <table>
+      <caption>시점 대비 종점 변동</caption>
+      <thead>
+        <tr>
+          <th>지수</th>
+          <th>시점(원지수)</th>
+          <th>종점(원지수)</th>
+          <th>재지수(종점)</th>
+          <th>누적변동률</th>
+          <th>연평균(CAGR)</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </section>
+
+  <section class="panel analysis">
+    <h2>분석</h2>
+    <div id="analysis"></div>
+  </section>
+
+  <footer>
+    <div>자료: 통계청 소비자물가지수(DT_1J22003) · 한국건설기술연구원 건설공사비지수(DT_39701_A003) ·
+      한국은행 국내총생산에 대한 지출 디플레이터 중 건설투자(DT_200Y112), KOSIS OpenAPI.</div>
+    <div style="margin-top:6px">자료 갱신: <code id="updated">—</code> ·
+      재지수화 방식: 각 지수의 원지수를 시점값으로 나누어 100 기준 환산.
+      분기 지수(디플레이터)는 해당 월이 속한 분기값을 사용.</div>
+  </footer>
+</div>
+
+<script>
+/* ===== 임베디드 폴백 샘플 (data/indices.json 로드 실패 시 사용) ===== */
+const EMBEDDED_SAMPLE = {"updated_at":"2026-06-24T00:03:15+09:00","is_sample":true,"base_note":"각 지수의 원자료 기준연도(예: 2020=100)는 표마다 다를 수 있으며, 본 도구는 입력한 '시점'을 100으로 재지수화하여 비교합니다.","indices":{"cpi":{"code":"DT_1J22003","org_id":"101","name":"소비자물가지수","short":"CPI","matched_label":"총지수","unit":"2020=100","freq":"M","series":[{"period":"201501","value":97.076},{"period":"201502","value":97.259},{"period":"201503","value":97.273},{"period":"201504","value":97.198},{"period":"201505","value":97.244},{"period":"201506","value":97.446},{"period":"201507","value":97.611},{"period":"201508","value":97.602},{"period":"201509","value":97.538},{"period":"201510","value":97.62},{"period":"201511","value":97.837},{"period":"201512","value":97.981},{"period":"201601","value":97.953},{"period":"201602","value":97.908},{"period":"201603","value":98.026},{"period":"201604","value":98.253},{"period":"201605","value":98.374},{"period":"201606","value":98.334},{"period":"201607","value":98.314},{"period":"201608","value":98.47},{"period":"201609","value":98.7},{"period":"201610","value":98.798},{"period":"201611","value":98.753},{"period":"201612","value":98.766},{"period":"201701","value":98.956},{"period":"201702","value":99.185},{"period":"201703","value":99.262},{"period":"201704","value":99.219},{"period":"201705","value":99.27},{"period":"201706","value":99.492},{"period":"201707","value":99.717},{"period":"201708","value":99.774},{"period":"201709","value":99.744},{"period":"201710","value":99.837},{"period":"201711","value":100.088},{"period":"201712","value":100.303},{"period":"201801","value":100.346},{"period":"201802","value":100.336},{"period":"201803","value":100.474},{"period":"201804","value":100.75},{"period":"201805","value":100.954},{"period":"201806","value":100.988},{"period":"201807","value":101.007},{"period":"201808","value":101.192},{"period":"201809","value":101.486},{"period":"201810","value":101.678},{"period":"201811","value":101.709},{"period":"201812","value":101.763},{"period":"201901","value":101.994},{"period":"201902","value":102.302},{"period":"201903","value":102.48},{"period":"201904","value":102.515},{"period":"201905","value":102.61},{"period":"201906","value":102.884},{"period":"201907","value":103.199},{"period":"201908","value":103.362},{"period":"201909","value":103.408},{"period":"201910","value":103.547},{"period":"201911","value":103.859},{"period":"201912","value":104.173},{"period":"202001","value":104.321},{"period":"202002","value":104.382},{"period":"202003","value":104.566},{"period":"202004","value":104.907},{"period":"202005","value":105.213},{"period":"202006","value":105.346},{"period":"202007","value":105.424},{"period":"202008","value":105.651},{"period":"202009","value":106.012},{"period":"202010","value":106.301},{"period":"202011","value":106.417},{"period":"202012","value":106.516},{"period":"202101","value":106.779},{"period":"202102","value":107.149},{"period":"202103","value":107.412},{"period":"202104","value":107.512},{"period":"202105","value":107.632},{"period":"202106","value":107.924},{"period":"202107","value":108.29},{"period":"202108","value":108.52},{"period":"202109","value":108.604},{"period":"202110","value":108.743},{"period":"202111","value":109.056},{"period":"202112","value":109.405},{"period":"202201","value":109.596},{"period":"202202","value":109.665},{"period":"202203","value":109.822},{"period":"202204","value":110.147},{"period":"202205","value":110.468},{"period":"202206","value":110.617},{"period":"202207","value":110.673},{"period":"202208","value":110.848},{"period":"202209","value":111.174},{"period":"202210","value":111.459},{"period":"202211","value":111.566},{"period":"202212","value":111.613},{"period":"202301","value":111.803},{"period":"202302","value":112.123},{"period":"202303","value":112.366},{"period":"202304","value":112.431},{"period":"202305","value":112.475},{"period":"202306","value":112.679},{"period":"202307","value":112.985},{"period":"202308","value":113.182},{"period":"202309","value":113.211},{"period":"202310","value":113.257},{"period":"202311","value":113.473},{"period":"202312","value":113.759},{"period":"202401","value":113.908},{"period":"202402","value":113.908},{"period":"202403","value":113.962},{"period":"202404","value":114.188},{"period":"202405","value":114.449},{"period":"202406","value":114.551},{"period":"202407","value":114.53},{"period":"202408","value":114.597},{"period":"202409","value":114.83},{"period":"202410","value":115.061},{"period":"202411","value":115.119},{"period":"202412","value":115.085},{"period":"202501","value":115.17},{"period":"202502","value":115.407},{"period":"202503","value":115.604},{"period":"202504","value":115.623},{"period":"202505","value":115.584},{"period":"202506","value":115.69},{"period":"202507","value":115.927},{"period":"202508","value":116.087},{"period":"202509","value":116.073},{"period":"202510","value":116.038},{"period":"202511","value":116.166},{"period":"202512","value":116.397},{"period":"202601","value":116.52},{"period":"202602","value":116.479},{"period":"202603","value":116.456},{"period":"202604","value":116.605}]},"construction":{"code":"DT_39701_A003","org_id":"397","name":"건설공사비지수","short":"공사비","matched_label":"총지수","unit":"2020=100","freq":"M","series":[{"period":"201501","value":82.575},{"period":"201502","value":82.824},{"period":"201503","value":82.904},{"period":"201504","value":82.894},{"period":"201505","value":83.006},{"period":"201506","value":83.273},{"period":"201507","value":83.504},{"period":"201508","value":83.56},{"period":"201509","value":83.56},{"period":"201510","value":83.707},{"period":"201511","value":83.99},{"period":"201512","value":84.199},{"period":"201601","value":84.236},{"period":"201602","value":84.255},{"period":"201603","value":84.439},{"period":"201604","value":84.731},{"period":"201605","value":84.918},{"period":"201606","value":84.944},{"period":"201607","value":84.99},{"period":"201608","value":85.213},{"period":"201609","value":85.511},{"period":"201610","value":85.677},{"period":"201611","value":85.701},{"period":"201612","value":85.784},{"period":"201701","value":86.045},{"period":"201702","value":86.348},{"period":"201703","value":86.498},{"period":"201704","value":86.532},{"period":"201705","value":86.66},{"period":"201706","value":86.962},{"period":"201707","value":87.269},{"period":"201708","value":87.412},{"period":"201709","value":87.47},{"period":"201710","value":87.654},{"period":"201711","value":88.001},{"period":"201712","value":88.316},{"period":"201801","value":88.463},{"period":"201802","value":88.562},{"period":"201803","value":88.815},{"period":"201804","value":89.21},{"period":"201805","value":89.542},{"period":"201806","value":89.71},{"period":"201807","value":89.87},{"period":"201808","value":90.205},{"period":"201809","value":90.658},{"period":"201810","value":91.018},{"period":"201811","value":91.228},{"period":"201812","value":91.472},{"period":"201901","value":91.904},{"period":"201902","value":92.425},{"period":"201903","value":92.829},{"period":"201904","value":93.104},{"period":"201905","value":93.454},{"period":"201906","value":93.998},{"period":"201907","value":94.597},{"period":"201908","value":95.061},{"period":"201909","value":95.424},{"period":"201910","value":95.898},{"period":"201911","value":96.561},{"period":"201912","value":97.245},{"period":"202001","value":97.779},{"period":"202002","value":98.243},{"period":"202003","value":98.848},{"period":"202004","value":99.627},{"period":"202005","value":100.386},{"period":"202006","value":100.988},{"period":"202007","value":101.55},{"period":"202008","value":102.274},{"period":"202009","value":103.145},{"period":"202010","value":103.954},{"period":"202011","value":104.6},{"period":"202012","value":105.237},{"period":"202101","value":106.044},{"period":"202102","value":106.961},{"period":"202103","value":107.775},{"period":"202104","value":108.426},{"period":"202105","value":109.095},{"period":"202106","value":109.933},{"period":"202107","value":110.84},{"period":"202108","value":111.604},{"period":"202109","value":112.213},{"period":"202110","value":112.867},{"period":"202111","value":113.684},{"period":"202112","value":114.523},{"period":"202201","value":115.191},{"period":"202202","value":115.721},{"period":"202203","value":116.325},{"period":"202204","value":117.078},{"period":"202205","value":117.812},{"period":"202206","value":118.356},{"period":"202207","value":118.79},{"period":"202208","value":119.324},{"period":"202209","value":119.994},{"period":"202210","value":120.605},{"period":"202211","value":121.02},{"period":"202212","value":121.361},{"period":"202301","value":121.828},{"period":"202302","value":122.41},{"period":"202303","value":122.899},{"period":"202304","value":123.198},{"period":"202305","value":123.462},{"period":"202306","value":123.873},{"period":"202307","value":124.374},{"period":"202308","value":124.754},{"period":"202309","value":124.957},{"period":"202310","value":125.167},{"period":"202311","value":125.537},{"period":"202312","value":125.969},{"period":"202401","value":126.255},{"period":"202402","value":126.386},{"period":"202403","value":126.563},{"period":"202404","value":126.907},{"period":"202405","value":127.279},{"period":"202406","value":127.488},{"period":"202407","value":127.568},{"period":"202408","value":127.733},{"period":"202409","value":128.06},{"period":"202410","value":128.38},{"period":"202411","value":128.525},{"period":"202412","value":128.575},{"period":"202501","value":128.741},{"period":"202502","value":129.057},{"period":"202503","value":129.331},{"period":"202504","value":129.425},{"period":"202505","value":129.46},{"period":"202506","value":129.637},{"period":"202507","value":129.945},{"period":"202508","value":130.175},{"period":"202509","value":130.229},{"period":"202510","value":130.262},{"period":"202511","value":130.457},{"period":"202512","value":130.755},{"period":"202601","value":130.945},{"period":"202602","value":130.969},{"period":"202603","value":131.012},{"period":"202604","value":131.226}]},"deflator":{"code":"DT_200Y112","org_id":"301","name":"건설투자 디플레이터","short":"디플레이터","matched_label":"건설투자","unit":"2020=100","freq":"Q","series":[{"period":"20151","ym":"201503","label":"2015 1/4","value":84.206},{"period":"20152","ym":"201506","label":"2015 2/4","value":84.61},{"period":"20153","ym":"201509","label":"2015 3/4","value":85.025},{"period":"20154","ym":"201512","label":"2015 4/4","value":85.452},{"period":"20161","ym":"201603","label":"2016 1/4","value":85.894},{"period":"20162","ym":"201606","label":"2016 2/4","value":86.355},{"period":"20163","ym":"201609","label":"2016 3/4","value":86.838},{"period":"20164","ym":"201612","label":"2016 4/4","value":87.348},{"period":"20171","ym":"201703","label":"2017 1/4","value":87.89},{"period":"20172","ym":"201706","label":"2017 2/4","value":88.472},{"period":"20173","ym":"201709","label":"2017 3/4","value":89.098},{"period":"20174","ym":"201712","label":"2017 4/4","value":89.779},{"period":"20181","ym":"201803","label":"2018 1/4","value":90.524},{"period":"20182","ym":"201806","label":"2018 2/4","value":91.341},{"period":"20183","ym":"201809","label":"2018 3/4","value":92.241},{"period":"20184","ym":"201812","label":"2018 4/4","value":93.236},{"period":"20191","ym":"201903","label":"2019 1/4","value":94.333},{"period":"20192","ym":"201906","label":"2019 2/4","value":95.541},{"period":"20193","ym":"201909","label":"2019 3/4","value":96.866},{"period":"20194","ym":"201912","label":"2019 4/4","value":98.307},{"period":"20201","ym":"202003","label":"2020 1/4","value":99.862},{"period":"20202","ym":"202006","label":"2020 2/4","value":101.52},{"period":"20203","ym":"202009","label":"2020 3/4","value":103.264},{"period":"20204","ym":"202012","label":"2020 4/4","value":105.072},{"period":"20211","ym":"202103","label":"2021 1/4","value":106.917},{"period":"20212","ym":"202106","label":"2021 2/4","value":108.768},{"period":"20213","ym":"202109","label":"2021 3/4","value":110.594},{"period":"20214","ym":"202112","label":"2021 4/4","value":112.367},{"period":"20221","ym":"202203","label":"2022 1/4","value":114.062},{"period":"20222","ym":"202206","label":"2022 2/4","value":115.659},{"period":"20223","ym":"202209","label":"2022 3/4","value":117.147},{"period":"20224","ym":"202212","label":"2022 4/4","value":118.518},{"period":"20231","ym":"202303","label":"2023 1/4","value":119.772},{"period":"20232","ym":"202306","label":"2023 2/4","value":120.913},{"period":"20233","ym":"202309","label":"2023 3/4","value":121.948},{"period":"20234","ym":"202312","label":"2023 4/4","value":122.884},{"period":"20241","ym":"202403","label":"2024 1/4","value":123.734},{"period":"20242","ym":"202406","label":"2024 2/4","value":124.506},{"period":"20243","ym":"202409","label":"2024 3/4","value":125.211},{"period":"20244","ym":"202412","label":"2024 4/4","value":125.859},{"period":"20251","ym":"202503","label":"2025 1/4","value":126.457},{"period":"20252","ym":"202506","label":"2025 2/4","value":127.014},{"period":"20253","ym":"202509","label":"2025 3/4","value":127.537},{"period":"20254","ym":"202512","label":"2025 4/4","value":128.03},{"period":"20261","ym":"202603","label":"2026 1/4","value":128.499}]}}};
+
+const COLORS = {
+  cpi:getCss('--cpi'), construction:getCss('--con'), deflator:getCss('--def')
+};
+const ORDER = ["cpi","construction","deflator"];
+function getCss(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+
+let DATA=null, chart=null;
+
+/* ---------- 기간 유틸 ---------- */
+function ymToNum(ym){return parseInt(ym,10);}              // "202403" -> 202403
+function quarterEndMonth(ym){                              // 월 -> 그 월이 속한 분기말월(YYYYMM)
+  const y=ym.slice(0,4), m=parseInt(ym.slice(4),10);
+  const q=Math.ceil(m/3);
+  return y + String(q*3).padStart(2,'0');
+}
+function monthRange(a,b){                                  // 월 단위 배열 생성
+  let y=+a.slice(0,4), m=+a.slice(4), ey=+b.slice(0,4), em=+b.slice(4), out=[];
+  while(y<ey || (y===ey && m<=em)){ out.push(`${y}${String(m).padStart(2,'0')}`); m++; if(m>12){m=1;y++;} }
+  return out;
+}
+function fmtYM(ym){return `${ym.slice(0,4)}.${ym.slice(4)}`;}
+
+/* ---------- 인덱스별 조회기 ---------- */
+function makeLookup(idx){
+  const map=new Map();
+  const keyed=[];
+  for(const p of idx.series){
+    const key = idx.freq==="Q" ? p.ym : p.period;   // 분기는 분기말월(ym)로 키
+    map.set(key, p.value);
+    keyed.push([ymToNum(key), p.value]);
+  }
+  keyed.sort((a,b)=>a[0]-b[0]);
+  return function(ym){
+    const target = idx.freq==="Q" ? quarterEndMonth(ym) : ym;
+    if(map.has(target)) return map.get(target);
+    // 폴백: target 이하 가장 최근값, 없으면 가장 이른값
+    const t=ymToNum(target); let last=null;
+    for(const [k,v] of keyed){ if(k<=t) last=v; else break; }
+    return last!==null ? last : (keyed.length?keyed[0][1]:null);
+  };
+}
+function dataBounds(){
+  // 월간 지수(cpi, construction) 기준으로 입력 가능 범위 결정
+  let lo=null, hi=null;
+  for(const k of ["cpi","construction"]){
+    const s=DATA.indices[k].series;
+    if(!s.length) continue;
+    const a=s[0].period, b=s[s.length-1].period;
+    if(lo===null||a<lo) lo=a;
+    if(hi===null||b>hi) hi=b;
+  }
+  return {lo,hi};
+}
+
+/* ---------- 분석 계산 ---------- */
+function analyze(start,end){
+  const months=monthRange(start,end);
+  const out={};
+  for(const k of ORDER){
+    const idx=DATA.indices[k];
+    const lk=makeLookup(idx);
+    const base=lk(start), endv=lk(end);
+    const rebased=months.map(m=>{const v=lk(m); return v!=null&&base?+(v/base*100).toFixed(2):null;});
+    const change= base&&endv ? (endv/base-1)*100 : null;
+    const n=months.length-1;
+    const cagr= base&&endv&&n>0 ? (Math.pow(endv/base,12/n)-1)*100 : null;
+    out[k]={idx,base,endv,change,cagr,rebased};
+  }
+  return {months,out};
+}
+
+/* ---------- 렌더 ---------- */
+function num(x,d=2){return x==null?"–":x.toLocaleString("ko-KR",{minimumFractionDigits:d,maximumFractionDigits:d});}
+function pct(x){return x==null?"–":(x>=0?"+":"")+x.toFixed(2)+"%";}
+
+function render(start,end){
+  const A=analyze(start,end);
+  document.getElementById("rangeLabel").textContent=`${fmtYM(start)} → ${fmtYM(end)}`;
+  drawChart(A);
+  drawTable(A);
+  drawAnalysis(start,end,A);
+}
+
+function drawChart(A){
+  const labels=A.months.map(fmtYM);
+  const ds=[];
+  const meta={cpi:["소비자물가지수",COLORS.cpi],construction:["건설공사비지수",COLORS.construction],deflator:["건설투자 디플레이터",COLORS.deflator]};
+  ORDER.forEach((k,i)=>{
+    ds.push({
+      label:meta[k][0], data:A.out[k].rebased, borderColor:meta[k][1],
+      backgroundColor:meta[k][1], borderWidth:2.2, pointRadius:0, pointHoverRadius:4,
+      tension:k==="deflator"?0:.18, stepped:k==="deflator"?true:false,
+      fill: k==="construction" ? {target:0, above:getCss('--gap'), below:getCss('--gap')} : false,
+      order: k==="construction"?2:1
+    });
+  });
+  const cfg={
+    type:"line",
+    data:{labels,datasets:ds},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:"index",intersect:false},
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y==null?"–":c.parsed.y.toFixed(2)}`}
+        }
+      },
+      scales:{
+        x:{ticks:{maxTicksLimit:10,font:{family:getCss('--mono'),size:11},color:'#7c8794'},grid:{display:false}},
+        y:{ticks:{font:{family:getCss('--mono'),size:11},color:'#7c8794'},
+           grid:{color:'#EEF1F4'},
+           title:{display:true,text:'재지수 (시점=100)',font:{size:11},color:'#7c8794'}}
+      }
+    }
+  };
+  // 100 기준선 (인라인 플러그인)
+  const baseline={id:'baseline',afterDatasetsDraw(c){
+    const y=c.scales.y.getPixelForValue(100);
+    const{left,right}=c.chartArea; const ctx=c.ctx;
+    ctx.save();ctx.strokeStyle='#B9C2CB';ctx.setLineDash([4,4]);ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(right,y);ctx.stroke();ctx.restore();
+  }};
+  cfg.plugins=[baseline];
+  if(chart)chart.destroy();
+  chart=new Chart(document.getElementById("chart"),cfg);
+}
+
+function drawTable(A){
+  const meta={cpi:["소비자물가지수",COLORS.cpi],construction:["건설공사비지수",COLORS.construction],deflator:["건설투자 디플레이터",COLORS.deflator]};
+  const rows=ORDER.map(k=>{
+    const o=A.out[k]; const cls=o.change>=0?"up":"down";
+    return `<tr>
+      <td><span class="idx-tag"><i class="dot" style="background:${meta[k][1]}"></i>${meta[k][0]}</span></td>
+      <td class="num">${num(o.base)}</td>
+      <td class="num">${num(o.endv)}</td>
+      <td class="num">${num(o.endv&&o.base?o.endv/o.base*100:null)}</td>
+      <td class="num delta ${cls}">${pct(o.change)}</td>
+      <td class="num">${pct(o.cagr)}</td>
+    </tr>`;
+  }).join("");
+  document.getElementById("tbody").innerHTML=rows;
+}
+
+function drawAnalysis(start,end,A){
+  const cpi=A.out.cpi, con=A.out.construction, def=A.out.deflator;
+  const gapCon = (con.change!=null&&cpi.change!=null)?con.change-cpi.change:null;  // %p
+  const gapDef = (def.change!=null&&cpi.change!=null)?def.change-cpi.change:null;
+  const span=A.months.length-1;
+  const yrs=(span/12).toFixed(1);
+
+  const sign = v => v==null?"" : (v>=0?"높게":"낮게");
+  const absp = v => v==null?"–":Math.abs(v).toFixed(2);
+
+  let keyMsg;
+  if(gapCon==null){
+    keyMsg=`선택 구간의 자료가 부족하여 격차를 산정할 수 없습니다. 시점·종점을 자료 보유 범위 내로 조정해 주세요.`;
+  }else if(gapCon>0){
+    keyMsg=`이 구간에서 <strong>건설공사비지수</strong>는 소비자물가지수보다 <mark>${absp(gapCon)}%p</mark> 더 상승했습니다.
+      소비자물가지수를 가격기준시점 보정지수로 적용하면 실제 공사비 상승분 대비 약 <mark>${absp(gapCon)}%p</mark> 만큼
+      <strong>과소보정</strong>될 수 있습니다.`;
+  }else{
+    keyMsg=`이 구간에서는 <strong>건설공사비지수</strong>가 소비자물가지수보다 <mark>${absp(gapCon)}%p</mark> 낮게 상승했습니다.
+      소비자물가지수 기준 보정이 실제 공사비 상승분을 <strong>상회</strong>할 수 있는 구간입니다.`;
+  }
+
+  const html=`
+    <div class="key">${keyMsg}</div>
+    <p>가격기준시점 <mark>${fmtYM(start)}</mark>부터 <mark>${fmtYM(end)}</mark>까지 약 <mark>${yrs}년</mark> 동안,
+      소비자물가지수는 <mark>${pct(cpi.change)}</mark>(연평균 ${pct(cpi.cagr)}),
+      건설공사비지수는 <mark>${pct(con.change)}</mark>(연평균 ${pct(con.cagr)}),
+      건설투자 디플레이터는 <mark>${pct(def.change)}</mark>(연평균 ${pct(def.cagr)}) 변동했습니다.</p>
+    <p>건설투자 디플레이터는 소비자물가지수 대비 ${gapDef==null?"비교 불가":`<mark>${absp(gapDef)}%p</mark> ${sign(gapDef)}`} 상승하여,
+      건설공사비지수와 함께 건설부문 가격상승이 일반 소비자물가 상승을 ${(gapCon>0||gapDef>0)?"앞선":"밑돈"} 흐름을 보입니다.
+      두 건설 관련 지수는 산정 대상·방식이 달라 정확히 일치하지는 않으나, 보정지수 선택에 따른 영향 방향을 교차 확인하는 근거로 활용할 수 있습니다.</p>
+    <p class="caveat">※ 본 분석은 참고용입니다. 실제 보정·정산은 해당 사업 실시협약에 규정된 적용지수와 산식(가격기준시점, 적용시점, 가중방식 등)을 우선합니다.
+      재지수화는 입력한 시점값을 100으로 환산한 상대 비교이며, 각 지수의 원자료 기준연도와는 별개입니다.</p>`;
+  document.getElementById("analysis").innerHTML=html;
+}
+
+/* ---------- 부팅 ---------- */
+function setupInputs(){
+  const {lo,hi}=dataBounds();
+  const toMonth=ym=>`${ym.slice(0,4)}-${ym.slice(4)}`;
+  const s=document.getElementById("start"), e=document.getElementById("end");
+  s.min=e.min=toMonth(lo); s.max=e.max=toMonth(hi);
+  e.value=toMonth(hi);                                   // 종점 기본값 = 최신월
+  // 시점 기본값: 종점 5년 전(없으면 최저월)
+  let dy=+hi.slice(0,4)-5, startYm=`${dy}${hi.slice(4)}`;
+  if(startYm<lo) startYm=lo;
+  s.value=toMonth(startYm);
+  document.getElementById("updated").textContent=DATA.updated_at||"—";
+  if(DATA.is_sample) document.getElementById("sampleBanner").classList.remove("hidden");
+}
+function readInputs(){
+  const m=v=>v.replace("-","");
+  return {start:m(document.getElementById("start").value), end:m(document.getElementById("end").value)};
+}
+function run(){
+  let {start,end}=readInputs();
+  if(start>end){[start,end]=[end,start];
+    document.getElementById("start").value=`${start.slice(0,4)}-${start.slice(4)}`;
+    document.getElementById("end").value=`${end.slice(0,4)}-${end.slice(4)}`;}
+  render(start,end);
+}
+async function boot(){
+  try{
+    const r=await fetch("./data/indices.json",{cache:"no-store"});
+    if(!r.ok) throw 0;
+    DATA=await r.json();
+  }catch(_){ DATA=EMBEDDED_SAMPLE; }
+  if(!DATA){document.getElementById("analysis").textContent="데이터를 불러오지 못했습니다.";return;}
+  setupInputs();
+  document.getElementById("run").addEventListener("click",run);
+  run();
+}
+boot();
+</script>
+</body>
+</html>
