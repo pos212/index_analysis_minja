@@ -53,7 +53,7 @@ CONFIG = {
 }
 
 
-def fetch_period(cfg, start_prd, end_prd):
+def fetch_period(cfg, start_prd, end_prd, retries=3):
     params = {
         "method": "getList", "apiKey": API_KEY,
         "orgId": cfg["org_id"], "tblId": cfg["tbl_id"],
@@ -62,13 +62,20 @@ def fetch_period(cfg, start_prd, end_prd):
         "prdSe": cfg["freq"], "startPrdDe": start_prd, "endPrdDe": end_prd,
     }
     url = BASE + "?" + urlencode(params)
-    req = Request(url, headers={"User-Agent": "kosis-index-tool/1.0"})
-    with urlopen(req, timeout=60) as r:
-        raw = r.read().decode("utf-8")
-    data = json.loads(raw)
-    if isinstance(data, dict) and data.get("err"):
-        raise RuntimeError(f"KOSIS 오류 {data.get('err')}: {data.get('errMsg')}")
-    return data if isinstance(data, list) else []
+    req = Request(url, headers={"User-Agent": "Mozilla/5.0 kosis-index-tool/1.0"})
+    last = None
+    for attempt in range(retries):
+        try:
+            with urlopen(req, timeout=120) as r:
+                raw = r.read().decode("utf-8")
+            data = json.loads(raw)
+            if isinstance(data, dict) and data.get("err"):
+                raise RuntimeError(f"KOSIS 오류 {data.get('err')}: {data.get('errMsg')}")
+            return data if isinstance(data, list) else []
+        except Exception as ex:
+            last = ex
+            time.sleep(5 * (attempt + 1))   # 5초, 10초, 15초 대기 후 재시도
+    raise last
 
 
 def period_bounds(freq, year):
