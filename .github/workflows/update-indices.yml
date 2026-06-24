@@ -11,10 +11,17 @@ on:
 permissions:
   contents: write
 
+
 jobs:
   update:
     runs-on: ubuntu-latest
     steps:
+      - name: 연결 점검
+        run: |
+          echo "--- HEAD 요청 ---"
+          curl -sS -m 60 -o /dev/null -w "응답코드: %{http_code}, 소요: %{time_total}s\n" \
+            "https://kosis.kr/openapi/Param/statisticsParameterData.do" || echo "curl 실패"
+            
       - name: 체크아웃
         uses: actions/checkout@v4
 
