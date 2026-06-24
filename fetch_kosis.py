@@ -154,16 +154,17 @@ def pick_series(cfg, rows):
 
 
 def collect(cfg):
-    rows = []
-    for year in range(START_YEAR, THIS_YEAR + 1):
-        s, e = period_bounds(cfg["freq"], year)
-        try:
-            chunk = fetch_period(cfg, s, e)
-        except (HTTPError, URLError) as ex:
-            print(f"  [{cfg['tbl_id']}] {year} 호출 실패: {ex}", file=sys.stderr)
-            chunk = []
-        rows.extend(chunk)
-        time.sleep(0.3)
+    if cfg["freq"] == "M":
+        s, e = f"{START_YEAR}01", f"{THIS_YEAR}12"
+    elif cfg["freq"] == "Q":
+        s, e = f"{START_YEAR}1", f"{THIS_YEAR}4"
+    else:
+        s, e = f"{START_YEAR}", f"{THIS_YEAR}"
+    try:
+        rows = fetch_period(cfg, s, e)
+    except Exception as ex:
+        print(f"  [{cfg['tbl_id']}] 호출 실패: {ex}", file=sys.stderr)
+        rows = []
     series, matched = pick_series(cfg, rows)
     return series, matched
 
