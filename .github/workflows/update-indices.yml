@@ -16,11 +16,17 @@ jobs:
   update:
     runs-on: ubuntu-latest
     steps:
-      - name: 연결 점검
+      - name: 연결 진단
         run: |
-          echo "--- HEAD 요청 ---"
-          curl -sS -m 60 -o /dev/null -w "응답코드: %{http_code}, 소요: %{time_total}s\n" \
-            "https://kosis.kr/openapi/Param/statisticsParameterData.do" || echo "curl 실패"
+          echo "1) DNS 조회"
+          getent hosts kosis.kr || echo "DNS 실패"
+          echo "2) IPv4 강제 + 상세"
+          curl -4 -v -sS -m 60 -o /dev/null \
+            -w "응답코드:%{http_code} 접속:%{time_connect}s TLS:%{time_appconnect}s 총:%{time_total}s\n" \
+            "https://kosis.kr/openapi/Param/statisticsParameterData.do" 2>&1 | tail -25
+          echo "3) IPv4 미강제(기본)"
+          curl -v -sS -m 60 -o /dev/null -w "응답코드:%{http_code} 총:%{time_total}s\n" \
+            "https://kosis.kr/openapi/Param/statisticsParameterData.do" 2>&1 | tail -15
             
       - name: 체크아웃
         uses: actions/checkout@v4
